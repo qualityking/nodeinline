@@ -1,20 +1,29 @@
 
-var onRequest = function (request, response) {
-
-  response.writeHead(200, {"Content-Type": "text/html"});  
-  response.end();
-}
-
 
 var http = require("http");
 var inline = require("./inline");
-inline.compile();		
+var url = require("url");
 
-http.createServer(onRequest).listen(8080);
-console.log('Starting server...');
+inline.compile("www");		
+
+http.createServer(function (request, response){
+  navigate(request, response);
+  response.writeHead(200, {"Content-Type": "text/html"});  
+  response.end();
+
+}).listen(8080);
 console.log('Server running at http://127.0.0.1:8080/');
 
 
+function navigate(request, response){
+
+ var pathname = url.parse(request.url).pathname;
+ console.log(pathname);
+ pathname = "compiled/www_index.js";
+ var file = require(pathname);
+ //evel();
+ file.www_index(request, response);
+}
 
 
 

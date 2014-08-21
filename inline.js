@@ -1,16 +1,37 @@
 var fs = require('fs');
+var path = require('path'); 
 var readline = require('readline');
 var stream = require('stream');
+var webroot = require('./webroot');
+
+
 
 var NodeScript = ""; 
 
-function compile() {
+function compile(root){
+	var filelist = webroot.getFileList(root)
+	filelist.forEach(doCompile);
+}
+
+function doCompile(fileName) {
  	
-	var instream = fs.createReadStream('./nodeapp/www/index.html');
-		
+	var _newfilename = 'compiled/' + fileName.replace('/','_');
+	var j = _newfilename.lastIndexOf('.');
+	var extn = _newfilename.substring(j).toLowerCase()
+	var newfilename  = _newfilename.replace(extn,".js");			
+	
+	if (path.existsSync(newfilename)) { 
+		fs.unlink(newfilename);
+	}
+	fs.appendFile(newfilename, "exports.www_index = function www_index(request,response) {");
+	
+	//setTimeout(function() {
+	//}, 10000);
+	
 	var scripletStart= false; 
 	var scripletInlineStart= false; 
 	
+	var instream = fs.createReadStream(fileName);
 	
 	var rl = readline.createInterface({
 		input: instream,
@@ -45,24 +66,32 @@ function compile() {
 		}
 		
 		if(!scripletStart && line!="" && !scripletInlineStart){
-			NodeScript = NodeScript + "response.write('"  + line + "'); " + "\n";  
+			line =  "response.write('"  + line + "'); " + "\n";  
 		}
 		else {
-			NodeScript = NodeScript + line + "\n"; 
+			line =  line + "\n"; 
 		}
-		fs.appendFile('./nodeapp/compiled/message.txt', line);
+		fs.appendFile(newfilename, line);
 	}
 				
 		
 	});		
 	
-	//console.log(NodeScript);
-	
-	//console.log(NodeScript);
-	//rl = null; 
-	//instream = null; 
+	rl.on('close', function(line) {
+		fs.appendFile(newfilename, '}');
+	});
+
 }
+
+
 exports.compile = compile;
 
+
+
+function generateNavigate(filePath){
+
+	var module = require(filePath); 
+	
+}
 
 
