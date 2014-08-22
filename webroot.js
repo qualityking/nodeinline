@@ -27,4 +27,3 @@ function getFiles(dir, files_) {
 }
 
 exports.getFileList = getFiles;
-//console.log(getFiles('www'))
