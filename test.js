@@ -1,30 +1,9 @@
-var fs = require('fs');
+var lineReader = require('./line-reader');
 
-function getFiles(dir, files_) {
-	files_ = files_ || [];
-	if (typeof files_ === 'undefined')
-		files_ = [];
-	var files = fs.readdirSync(dir);
-	for (var i in files) {
-		if (!files.hasOwnProperty(i))
-			continue;
-		var name = dir + '/' + files[i];
-		if (fs.statSync(name).isDirectory()) {
-			if (files[i].charAt(0) == ".")
-				continue;
-			getFiles(name, files_);
-		} else {
-			var j = files[i].lastIndexOf('.');
-			if (j > 0) {
-				if (files[i].substring(j).toLowerCase() == '.html' || files[i].substring(j).toLowerCase() == '.htm') {
-					files_.push(name);
-				}
-			}
-		}
-	}
-
-	return files_;
-}
-
-exports.webroot = getFiles;
-//console.log(getFiles('www'))
+lineReader.eachLine('www/index.html', function(line) {
+ if(!line=="" && line!=null && line!="\n" && line!="\r" && line!="\l" && line!="\lr"){
+	console.log(line);
+  }
+}).then(function () {
+  console.log("I'm done!!");
+});
