@@ -5,49 +5,44 @@ var fs = require('fs');
 var path = require('path');
 var readline = require('readline');
 var stream = require('stream');
-var webroot = require('./webroot');
+var webroot = require('./lib/webroot');
 var url = require("url");
 var rootdir = "";
-var lineReader = require('./line-reader');
+var lineReader = require('./lib/line-reader');
 
 exports.rootdir = rootdir;
 
 exports.navigate = function navigate(request, response) {
 	var _rootdir = this.rootdir;
-	var pathname = url.parse(request.url).pathname;
+	
+	var pathname = '.' + url.parse(request.url).pathname;
 
-	if (pathname.toLowerCase() == "/favicon.ico") {
+	if (pathname.toLowerCase() == "./favicon.ico") {
+		response.end();
 		return;
 	}
+	else if (pathname == "./") {
+		pathname = "./index.node";
+	}
 
-	var contentType = contentTypeRequest(response, pathname);
-	//console.log(contentType);
+	var contentType = setContentType(request,response, pathname);
+	
+	if (contentType == "cache"){
+		//console.log("inside cache");
+		response.end();
+	}
+	else if (contentType == "static") {
+		//console.log("inside static"); 
+		content = fs.readFileSync(pathname);
+		response.end(content);
 
-	if (contentType == "static" || contentType == "binary") {
-		pathname = "." + pathname;
-		fs.readFile(pathname, function (error, content) {
-			if (error) {
-				response.writeHead(500);
-				response.end();
-			} else {
-				if (contentType == "static") {
-					response.end(content, 'utf-8');
-				} else {
-					response.end(content, 'binary');
-				}
-
-			}
-		});
-
-	} else {
-		if (pathname == "/") {
-			pathname = "/index.html";
-		}
-
+	} else if (contentType == "dynamic") {
+		//console.log("inside dynamic"); 
+		pathname = pathname.substring(1);
 		var _newfilename = './compiled/' + _rootdir + pathname.replace(/\//g, "_");
 		var j = _newfilename.lastIndexOf('.');
 		var extn = _newfilename.substring(j).toLowerCase() //TODO : update find extn using path.extname
-			var jsfilename = _newfilename.replace(extn, ".js"); // TODO : if extn like string will be in between file it will replace that too and not the last.
+		var jsfilename = _newfilename.replace(extn, ".js"); // TODO : if extn like string will be in between file it will replace that too and not the last.
 
 		var file = require(jsfilename);
 		file.loadPage(request, response);
@@ -120,38 +115,49 @@ function doCompile(fileName) {
 
 }
 
-function contentTypeRequest(response, filePath) {
-	var extname = path.extname(filePath);
-	extname = extname.replace('.', '');
-	var contentType = 'text/html';
-	var returnType = "static";
-	if (extname.toLowerCase() == "html" || extname.toLowerCase() == "htm" || filePath == "/") {
-		response.writeHead(200, {
-			'Content-Type' : contentType
-		});
-		return 'dynamic';
+
+function setContentType(request, response, pathname) {
+	var extname = path.extname(pathname);
+	var headercode = 200; 
+
+	if(extname!='.node') {
+		var reqModDate = request.headers["if-modified-since"];
+		if(!fs.existsSync(pathname)){
+			response.writeHead(404, {'Content-Type' : extensions[extname]});
+			console.log("404 : ", pathname);
+			response.end(); return ""; 
+		}
+		var stats = fs.statSync(pathname);
+		var mtime = stats.mtime;
+		var size = stats.size;
+
+		
+		if (reqModDate!=null || reqModDate!='undefined') {		
+			reqModDate = new Date(reqModDate);
+		    if(reqModDate.getTime()==mtime.getTime()) {
+			   console.log("load from cache");
+			   headercode = 304;
+			   
+			}
+		}
+		response.writeHead(headercode, {'Content-Type' : extensions[extname],
+										'Last-Modified': mtime.toUTCString()
+		});		
+		
+
+	}			 
+    else {          
+		response.writeHead(headercode, {'Content-Type' : extensions[extname]});
 	}
-	switch (extname) {
-	case '.js':
-		contentType = 'text/javascript';
-		break;
-	case '.css':
-		contentType = 'text/css';
-		break;
-	case '.jpg':
-		contentType = 'image/jpeg';
-		returnType = "binary";
-		break;	
-	default:
-		contentType = 'image/' + extname;
-		returnType = "binary";
-		break;
-	}
-	response.writeHead(200, {'Content-Type' : contentType});
-	return 'static';
+	
+	if(extname=='.node'){return 'dynamic';}
+	else if (headercode==304){return 'cache';}
+	else if (headercode==200){return 'static';}
 }
 
+
 extensions = {
+	".node" : "text/html",
     ".html" : "text/html",
     ".css" : "text/css",
     ".js" : "application/javascript",
